@@ -1,20 +1,28 @@
 {
   "name": "ahrefsbot",
-  "description": "Bot Slack pour les rapports de backlinks cassés Ahrefs",
+  "description": "Bot Slack qui génère des rapports automatiques sur les backlinks cassés pour vos domaines, en utilisant l'API Ahrefs",
   "main": "index.js",
   "scripts": {
     "start": "node index.js",
-    "dev": "nodemon --watch schedules.json --watch *.js index.js"
+    "dev": "nodemon index.js"
   },
+  "keywords": [
+    "slack",
+    "bot",
+    "ahrefs",
+    "backlinks",
+    "seo"
+  ],
   "dependencies": {
     "@slack/bolt": "^3.12.2",
-    "@slack/web-api": "^6.8.1",
-    "axios": "^1.5.0",
-    "dotenv": "^16.3.1",
-    "node-cron": "^3.0.2"
+    "axios": "^1.3.4",
+    "cron-parser": "^4.7.1",
+    "dotenv": "^16.0.3",
+    "node-cron": "^3.0.2",
+    "uuid": "^9.0.0"
   },
   "devDependencies": {
-    "nodemon": "^3.0.1"
+    "nodemon": "^3.1.9"
   },
   "engines": {
     "node": ">=14.0.0"
