@@ -8,39 +8,29 @@ require('dotenv').config();
  */
 async function getBrokenBacklinks(domain) {
   try {
-    // En production, remplacez ce code par l'appel réel à l'API Ahrefs
     console.log(`Récupération des backlinks cassés pour ${domain}`);
     
-    // Simulation de données pour démonstration
-    // Dans une implémentation réelle, vous utiliseriez:
-    // const response = await axios.get(`https://api.ahrefs.com/v2/...`, {
-    //   headers: { Authorization: `Bearer ${process.env.AHREFS_API_KEY}` }
-    // });
+    const response = await axios.get(
+      `https://api.ahrefs.com/v2/broken-backlinks`, 
+      {
+        params: {
+          target: domain,
+          mode: 'prefix',
+          limit: 100
+        },
+        headers: { 
+          'Authorization': `Bearer ${process.env.AHREFS_API_KEY}`,
+          'Accept': 'application/json'
+        }
+      }
+    );
     
-    // Données simulées
-    const brokenLinks = [];
-    
-    // Générer quelques backlinks cassés aléatoires
-    const errorCodes = [400, 404, 500, 503];
-    const sites = ["blog.com", "news.org", "example.net", "referral.site", "partner.co"];
-    
-    // Générer entre 10 et 30 liens
-    const count = Math.floor(Math.random() * 20) + 10;
-    
-    for (let i = 0; i < count; i++) {
-      const site = sites[Math.floor(Math.random() * sites.length)];
-      const path = `/page${i}-${Math.random().toString(36).substring(7)}`;
-      const errorCode = errorCodes[Math.floor(Math.random() * errorCodes.length)];
-      
-      brokenLinks.push({
-        url: `https://${site}${path}`,
-        errorCode: errorCode,
-        referringPage: `https://${site}/referrer${Math.floor(Math.random() * 100)}`
-      });
-    }
-    
-    console.log(`${brokenLinks.length} backlinks cassés trouvés`);
-    return brokenLinks;
+    // Transformer les données selon la structure requise
+    return response.data.brokenBacklinks.map(link => ({
+      url: link.url,
+      errorCode: link.httpCode,
+      referringPage: link.refPage
+    }));
     
   } catch (error) {
     console.error(`Erreur lors de la récupération des données Ahrefs: ${error.message}`);
@@ -48,4 +38,42 @@ async function getBrokenBacklinks(domain) {
   }
 }
 
-module.exports = { getBrokenBacklinks };
+/**
+ * Récupère les statistiques de domaine depuis Ahrefs
+ * @param {string} domain - Domaine cible
+ * @returns {Promise<Object>} - Statistiques du domaine
+ */
+async function getDomainMetrics(domain) {
+  try {
+    const response = await axios.get(
+      `https://api.ahrefs.com/v2/domain-metrics`, 
+      {
+        params: {
+          target: domain,
+          mode: 'prefix'
+        },
+        headers: { 
+          'Authorization': `Bearer ${process.env.AHREFS_API_KEY}`,
+          'Accept': 'application/json'
+        }
+      }
+    );
+    
+    return {
+      domainRating: response.data.metrics.domainRating,
+      organicTraffic: response.data.metrics.organicTraffic,
+      totalBacklinks: response.data.metrics.backlinks,
+      totalReferringDomains: response.data.metrics.referringDomains
+    };
+  } catch (error) {
+    console.error(`Erreur lors de la récupération des métriques: ${error.message}`);
+    return {
+      domainRating: '-',
+      organicTraffic: '-',
+      totalBacklinks: '-',
+      totalReferringDomains: '-'
+    };
+  }
+}
+
+module.exports = { getBrokenBacklinks, getDomainMetrics };
