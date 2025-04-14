@@ -51,10 +51,18 @@ const app = new App({
 // Initialisation du bot
 async function startBot() {
   try {
-    await app.start(process.env.PORT || 3000);
-    console.log('⚡️ Bolt app is running!');
+    // Si nous sommes en mode socket, pas besoin de spécifier un port
+    if (process.env.SOCKET_MODE === 'true') {
+      await app.start();
+      console.log('⚡️ Bolt app is running in Socket Mode!');
+    } else {
+      // En mode HTTP, on spécifie un port
+      const port = process.env.PORT || 3000;
+      await app.start(port);
+      console.log(`⚡️ Bolt app is running in HTTP Mode on port ${port}!`);
+    }
+    
     console.log(`🔌 Mode Socket: ${process.env.SOCKET_MODE === 'true' ? 'Activé' : 'Désactivé'}`);
-    console.log(`🌐 Port HTTP: ${process.env.PORT || '3000'}`);
     
     // Initialisation du gestionnaire Slack
     slackHandler.initialize(app);
