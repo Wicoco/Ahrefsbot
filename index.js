@@ -52,9 +52,9 @@ const app = new App({
 async function startBot() {
   try {
     // Si nous sommes en mode socket, pas besoin de spécifier un port
-    if (process.env.SOCKET_MODE === 'true') {
-      await app.start();
-      console.log('⚡️ Bolt app is running in Socket Mode!');
+    if (process.env.SOCKET_MODE !== 'true' && process.env.SOCKET_MODE !== 'false') {
+      console.warn('⚠️ AVERTISSEMENT: SOCKET_MODE devrait être "true" ou "false". Utilisation de la valeur par défaut: true');
+      process.env.SOCKET_MODE = 'true';
     } else {
       // En mode HTTP, on spécifie un port
       const port = process.env.PORT || 3000;
@@ -64,10 +64,21 @@ async function startBot() {
     
     console.log(`🔌 Mode Socket: ${process.env.SOCKET_MODE === 'true' ? 'Activé' : 'Désactivé'}`);
     
+    if (process.env.AHREFS_API_KEY && !/^[a-zA-Z0-9]{32,}$/.test(process.env.AHREFS_API_KEY)) {
+      console.warn('⚠️ AVERTISSEMENT: Le format de AHREFS_API_KEY semble incorrect. Vérifiez votre configuration.');
+    }
     // Initialisation du gestionnaire Slack
     slackHandler.initialize(app);
     console.log('📆 Chargement des planifications...');
-    console.log('✅ Bot prêt à recevoir des commandes');
+    console.log(`
+      🤖 AhrefsBot est prêt !
+      
+      Commandes disponibles:
+      - /ahrefs-check [domaine] - Vérifier les backlinks d'un domaine
+      - /ahrefs-schedule [domaine] [fréquence] [canal] - Planifier une vérification régulière
+      - /ahrefs-list - Lister les vérifications planifiées
+      - /ahrefs-help - Afficher l'aide
+      `);
   } catch (error) {
     console.error('❌ Erreur lors du démarrage du bot:', error);
     process.exit(1);
