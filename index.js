@@ -1,17 +1,16 @@
 /**
  * Point d'entrée principal du bot Ahrefs
  */
-const path = require('path'); // Importation de path qui était manquant
+const path = require('path');
 
 require('dotenv').config({ path: path.resolve(__dirname, '.env') });
 
+
 console.log("Variables d'environnement :");
 console.log("SLACK_TOKEN présent:", !!process.env.SLACK_TOKEN);
-console.log("SLACK_BOT_TOKEN présent:", !!process.env.SLACK_BOT_TOKEN);
 console.log("SLACK_SIGNING_SECRET présent:", !!process.env.SLACK_SIGNING_SECRET);
 console.log("SLACK_APP_TOKEN présent:", !!process.env.SLACK_APP_TOKEN);
 console.log("AHREFS_API_KEY présent:", !!process.env.AHREFS_API_KEY);
-console.log("AHREFS_API_TOKEN présent:", !!process.env.AHREFS_API_TOKEN);
 console.log("SOCKET_MODE présent:", !!process.env.SOCKET_MODE);
 
 console.log("Chemin du fichier .env:", path.resolve(__dirname, '.env'));
@@ -81,9 +80,6 @@ async function startBot() {
     
     console.log(`🔌 Mode Socket: ${process.env.SOCKET_MODE === 'true' ? 'Activé' : 'Désactivé'}`);
     
-    if (process.env.AHREFS_API_KEY && !/^[a-zA-Z0-9]{32,}$/.test(process.env.AHREFS_API_KEY)) {
-      console.warn('⚠️ AVERTISSEMENT: Le format de AHREFS_API_KEY semble incorrect. Vérifiez votre configuration.');
-    }
     // Initialisation du gestionnaire Slack
     slackHandler.initialize(app);
     console.log('📆 Chargement des planifications...');
