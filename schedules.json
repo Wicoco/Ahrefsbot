@@ -1,15 +1,1 @@
-{
-    "schedules": [
-      {
-        "target": "example.com",
-        "cronSchedule": "0 9 * * 1",
-        "channel": "C01A2B3CDE4"
-      },
-      {
-        "target": "yourdomain.com",
-        "cronSchedule": "0 14 * * 3",
-        "channel": "C98F7E6D5C4"
-      }
-    ]
-  }
-  
+[]

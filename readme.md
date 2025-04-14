@@ -39,6 +39,18 @@ Bot Slack qui génère des rapports automatiques sur les backlinks cassés pour 
 - `/ahrefs-list` - Afficher tous les rapports programmés
 - `/ahrefs-help` - Afficher l'aide
 
+### Formats de planification
+
+Vous pouvez utiliser des expressions de planification simplifiées :
+- `daily 9h` - Tous les jours à 9h00
+- `daily 14h30` - Tous les jours à 14h30
+- `weekly 10h lundi` - Tous les lundis à 10h00
+- `monthly 9h 1` - Le 1er de chaque mois à 9h00
+
+Ou utiliser directement des expressions cron standard :
+- `0 9 * * *` - Tous les jours à 9h00
+- `0 9 * * 1` - Tous les lundis à 9h00
+
 ### Mentions
 
 Vous pouvez également mentionner le bot avec:
@@ -46,6 +58,20 @@ Vous pouvez également mentionner le bot avec:
 - `@Bot Ahrefs check example.com` - Vérifier les backlinks d'un domaine
 - `@Bot Ahrefs help` - Afficher l'aide
 
+## Structure du projet
+
+- `index.js` - Point d'entrée principal
+- `slackHandler.js` - Gestion des commandes Slack et des tâches programmées
+- `ahrefsAPI.js` - Communication avec l'API Ahrefs
+- `utils.js` - Fonctions utilitaires (formatage, parsing)
+- `schedules.json` - Configuration des tâches programmées
+
 ## Maintenance
 
 Pour modifier les rapports programmés, éditez le fichier `schedules.json`. Les changements sont automatiquement pris en compte sans redémarrage.
+
+## Dépannage
+
+- Si les rapports planifiés ne fonctionnent pas, vérifiez les logs du serveur et assurez-vous que le fichier `schedules.json` est bien formaté.
+- Pour les problèmes d'authentification, vérifiez vos tokens dans le fichier `.env`.
+- En cas de problème avec l'API Ahrefs, vérifiez que votre clé API est valide et que vous n'avez pas dépassé votre quota.

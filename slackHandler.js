@@ -1,290 +1,519 @@
-const { App } = require('@slack/bolt');
-const cron = require('node-cron');
+/**
+ * Gestionnaire des interactions Slack et des tâches programmées
+ */
 const fs = require('fs');
-const path = require('path');
-const { getBacklinkData } = require('./ahrefsAPI');
+const cron = require('node-cron');
+const ahrefsAPI = require('./ahrefsAPI');
 const utils = require('./utils');
 
-// Configuration Slack
-const app = new App({
-  token: process.env.SLACK_TOKEN,
-  signingSecret: process.env.SLACK_SIGNING_SECRET,
-  socketMode: true,
-  appToken: process.env.SLACK_APP_TOKEN,
-});
+// Stockage pour les tâches programmées actives
+const activeSchedules = {};
 
-// Tâches programmées
-let scheduledTasks = {};
-
-// Charger et programmer les tâches depuis le fichier
+// Chargement des planifications depuis le fichier
 function loadSchedules() {
   try {
-    const schedulesPath = path.join(__dirname, 'schedules.json');
-    const schedulesData = JSON.parse(fs.readFileSync(schedulesPath, 'utf8'));
-    
+    const scheduleData = JSON.parse(fs.readFileSync('./schedules.json', 'utf8'));
     // Annuler toutes les tâches existantes
-    Object.values(scheduledTasks).forEach(task => task.stop());
-    scheduledTasks = {};
+    Object.values(activeSchedules).forEach(schedule => schedule.stop());
+    Object.keys(activeSchedules).forEach(key => delete activeSchedules[key]);
     
-    // Programmer les nouvelles tâches
-    schedulesData.schedules.forEach(schedule => {
-      scheduleTask(schedule.target, schedule.cronSchedule, schedule.channel);
+    // Configurer les nouvelles tâches
+    scheduleData.forEach(item => {
+      setupScheduledTask(item.domain, item.cronExpression, item.channel, item.id);
     });
     
-    console.log(`Tâches programmées chargées: ${schedulesData.schedules.length}`);
+    console.log(`Planifications chargées : ${scheduleData.length} tâches configurées`);
   } catch (error) {
-    console.error('Erreur lors du chargement des tâches programmées:', error);
+    console.error('Erreur lors du chargement des planifications:', error);
   }
 }
 
-// Surveiller les changements dans le fichier schedules.json
+// Surveiller les changements dans le fichier de planification
 function watchSchedulesFile() {
-  const schedulesPath = path.join(__dirname, 'schedules.json');
-  fs.watch(schedulesPath, (eventType) => {
-    if (eventType === 'change') {
-      console.log('Fichier schedules.json modifié, rechargement...');
-      loadSchedules();
-    }
+  fs.watchFile('./schedules.json', (curr, prev) => {
+    console.log('Changement détecté dans schedules.json, rechargement...');
+    loadSchedules();
   });
 }
 
-// Ajouter une nouvelle tâche programmée
-function addSchedule(target, cronSchedule, channel) {
+// Configuration d'une tâche programmée
+function setupScheduledTask(domain, cronExpression, channel, id = null) {
+  if (!cronExpression || !domain || !channel) {
+    console.error('Paramètres manquants pour la tâche programmée:', { domain, cronExpression, channel });
+    return false;
+  }
+  
+  // Vérifier si l'expression cron est valide
+  if (!cron.validate(cronExpression)) {
+    console.error(`Expression cron invalide: ${cronExpression}`);
+    return false;
+  }
+  
+  // Générer un ID unique si non fourni
+  const taskId = id || `${domain}-${Date.now()}`;
+  
   try {
-    // Convertir le format simplifié en expression cron
-    const cronExpression = utils.parseSimplifiedCron(cronSchedule);
-    
-    // Valider l'expression cron
-    if (!cron.validate(cronExpression)) {
-      throw new Error(`Expression cron invalide: ${cronExpression}`);
-    }
-
-    const schedulesPath = path.join(__dirname, 'schedules.json');
-    const schedulesData = JSON.parse(fs.readFileSync(schedulesPath, 'utf8'));
-    
-    // Ajouter la nouvelle tâche
-    schedulesData.schedules.push({
-      target,
-      cronSchedule: cronExpression,
-      channel
+    // Créer et démarrer la tâche
+    const task = cron.schedule(cronExpression, async () => {
+      console.log(`Exécution de la tâche programmée pour ${domain} dans #${channel}`);
+      try {
+        await executeBacklinkCheck(domain, channel);
+      } catch (error) {
+        console.error(`Erreur lors de l'exécution de la tâche programmée pour ${domain}:`, error);
+        // Notification d'erreur dans Slack
+        app.client.chat.postMessage({
+          channel,
+          text: `:warning: Erreur lors de la vérification programmée pour *${domain}*: ${error.message}`
+        });
+      }
     });
     
-    // Enregistrer les modifications
-    fs.writeFileSync(schedulesPath, JSON.stringify(schedulesData, null, 2));
+    // Enregistrer la tâche active
+    activeSchedules[taskId] = task;
+    console.log(`Tâche programmée configurée pour ${domain}: ${utils.cronToText(cronExpression)}`);
+    return taskId;
     
-    // Programmer la tâche
-    scheduleTask(target, cronExpression, channel);
-    
-    return { success: true, cronExpression };
   } catch (error) {
-    console.error('Erreur lors de l\'ajout d\'une tâche programmée:', error);
-    return { success: false, error: error.message };
+    console.error(`Erreur lors de la configuration de la tâche pour ${domain}:`, error);
+    return false;
   }
 }
 
-// Programmer une tâche
-function scheduleTask(target, cronSchedule, channel) {
-  const taskId = `${target}-${channel}`;
-  const task = cron.schedule(cronSchedule, async () => {
-    try {
-      console.log(`Exécution de la tâche programmée: ${target} pour ${channel}`);
-      const data = await getBacklinkData(target);
-      const message = utils.formatBacklinkReport(data, target);
-      
-      await app.client.chat.postMessage({
+// Exécution d'une vérification de backlinks
+async function executeBacklinkCheck(domain, channel) {
+  try {
+    // Envoyer un message initial
+    const loadingMessage = await app.client.chat.postMessage({
+      channel,
+      text: `:hourglass_flowing_sand: Vérification des backlinks cassés pour *${domain}* en cours...`
+    });
+    
+    // Récupérer les données
+    const data = await ahrefsAPI.getBacklinkData(domain);
+    
+    // Si pas de backlinks cassés, message simple
+    if (data.brokenBacklinks === 0) {
+      await app.client.chat.update({
         channel,
-        text: `*Rapport programmé pour ${target}*`,
-        blocks: message
+        ts: loadingMessage.ts,
+        text: `:white_check_mark: Aucun backlink cassé détecté pour *${domain}* ! (DR: ${data.domainRating}, Backlinks: ${data.totalBacklinks})`
       });
-    } catch (error) {
-      console.error(`Erreur lors de l'exécution de la tâche ${taskId}:`, error);
-      
-      await app.client.chat.postMessage({
-        channel,
-        text: `*Erreur lors du rapport programmé pour ${target}*\nDétail: ${error.message}`
-      });
+      return;
     }
-  });
-  
-  scheduledTasks[taskId] = task;
-  console.log(`Tâche programmée: ${taskId} avec programmation ${cronSchedule}`);
+    
+    // Sinon, message détaillé
+    const errorCounts = utils.getErrorCounts(data.brokenLinks);
+    const blocks = utils.formatBrokenLinksMessage(domain, data.brokenLinks, errorCounts, data, loadingMessage.ts);
+    
+    await app.client.chat.update({
+      channel,
+      ts: loadingMessage.ts,
+      blocks,
+      text: `Rapport de backlinks cassés pour ${domain}`
+    });
+    
+  } catch (error) {
+    console.error(`Erreur lors de la vérification pour ${domain}:`, error);
+    throw error;
+  }
 }
 
-// Initialisation du bot
-function initializeBot() {
-  // Commande slash pour vérifier un domaine
+// Sauvegarder une planification
+function saveSchedule(id, domain, cronExpression, channel) {
+  try {
+    let schedules = [];
+    
+    // Charger les planifications existantes
+    if (fs.existsSync('./schedules.json')) {
+      schedules = JSON.parse(fs.readFileSync('./schedules.json', 'utf8'));
+    }
+    
+    // Vérifier si cette planification existe déjà
+    const existingIndex = schedules.findIndex(s => s.id === id);
+    
+    if (existingIndex >= 0) {
+      // Mettre à jour
+      schedules[existingIndex] = { id, domain, cronExpression, channel };
+    } else {
+      // Ajouter
+      schedules.push({ id, domain, cronExpression, channel });
+    }
+    
+    // Enregistrer
+    fs.writeFileSync('./schedules.json', JSON.stringify(schedules, null, 2));
+    return true;
+    
+  } catch (error) {
+    console.error('Erreur lors de la sauvegarde de la planification:', error);
+    return false;
+  }
+}
+
+// Supprimer une planification
+function deleteSchedule(id) {
+  try {
+    // Charger les planifications existantes
+    if (!fs.existsSync('./schedules.json')) {
+      return false;
+    }
+    
+    let schedules = JSON.parse(fs.readFileSync('./schedules.json', 'utf8'));
+    const initialCount = schedules.length;
+    
+    // Filtrer pour supprimer
+    schedules = schedules.filter(s => s.id !== id);
+    
+    if (schedules.length === initialCount) {
+      return false; // Rien n'a été supprimé
+    }
+    
+    // Arrêter la tâche si active
+    if (activeSchedules[id]) {
+      activeSchedules[id].stop();
+      delete activeSchedules[id];
+    }
+    
+    // Enregistrer
+    fs.writeFileSync('./schedules.json', JSON.stringify(schedules, null, 2));
+    return true;
+    
+  } catch (error) {
+    console.error('Erreur lors de la suppression de la planification:', error);
+    return false;
+  }
+}
+
+// Obtenir toutes les planifications
+function getAllSchedules() {
+  try {
+    if (!fs.existsSync('./schedules.json')) {
+      return [];
+    }
+    
+    return JSON.parse(fs.readFileSync('./schedules.json', 'utf8'));
+  } catch (error) {
+    console.error('Erreur lors de la récupération des planifications:', error);
+    return [];
+  }
+}
+
+// Initialiser le gestionnaire avec l'application Slack
+let app;
+function initialize(slackApp) {
+  app = slackApp;
+  
+  // Gestionnaire de commande slash pour la vérification
   app.command('/ahrefs-check', async ({ command, ack, respond }) => {
     await ack();
     
-    const target = command.text.trim();
-    if (!target) {
-      await respond({
-        text: "Veuillez spécifier un domaine. Exemple: `/ahrefs-check example.com`"
-      });
+    const domain = command.text.trim();
+    if (!domain) {
+      await respond('Veuillez spécifier un domaine à vérifier. Exemple: `/ahrefs-check example.com`');
       return;
     }
     
     try {
       await respond({
-        text: `Analyse en cours pour ${target}...`
+        text: `:hourglass_flowing_sand: Vérification des backlinks cassés pour *${domain}* en cours...`,
+        response_type: 'in_channel'
       });
       
-      const data = await getBacklinkData(target);
-      const message = utils.formatBacklinkReport(data, target);
+      await executeBacklinkCheck(domain, command.channel_id);
       
-      await respond({
-        text: `Résultats pour ${target}`,
-        blocks: message
-      });
     } catch (error) {
-      console.error('Erreur lors de la vérification:', error);
+      console.error(`Erreur lors de la commande check pour ${domain}:`, error);
       await respond({
-        text: `Erreur lors de l'analyse de ${target}: ${error.message}`
+        text: `Erreur: ${error.message}`,
+        response_type: 'ephemeral'
       });
     }
   });
   
-  // Commande slash pour programmer un rapport
+  // Gestionnaire pour création/modification de planification
   app.command('/ahrefs-schedule', async ({ command, ack, respond }) => {
     await ack();
     
-    const parts = utils.parseCommandText(command.text);
+    // Parser les arguments
+    const args = utils.parseCommandText(command.text);
     
-    if (parts.length < 3) {
-      await respond({
-        text: "Format incorrect. Utilisez: `/ahrefs-schedule example.com \"daily 9h\" #channel`"
-      });
+    if (args.length < 2) {
+      await respond(`
+Usage: \`/ahrefs-schedule domaine "fréquence" #canal\`
+
+*Exemples:*
+• \`/ahrefs-schedule example.com "daily 9h"\` (tous les jours à 9h00)
+• \`/ahrefs-schedule example.com "weekly 14h30 lundi"\` (tous les lundis à 14h30)
+• \`/ahrefs-schedule example.com "monthly 10h 1"\` (le 1er jour de chaque mois à 10h00)
+• \`/ahrefs-schedule example.com "0 9 * * 1-5"\` (expression cron: lundi au vendredi à 9h00)
+      `);
       return;
     }
     
-    const [target, cronSchedule, channelName] = parts;
-    let channel = channelName.trim();
+    const domain = args[0];
+    const cronInput = args[1];
+    let channel = command.channel_id;
     
-    // Extraire l'ID du canal si le format est <#ID|name>
-    const channelMatch = channel.match(/<#([A-Z0-9]+)(?:\|.+)?>/);
-    if (channelMatch) {
-      channel = channelMatch[1];
+    // Si un canal est spécifié
+    if (args.length >= 3 && args[2].startsWith('<#')) {
+      channel = args[2].replace(/[<#>]/g, '').split('|')[0];
     }
     
     try {
-      const result = addSchedule(target, cronSchedule, channel);
+      // Convertir le format simplifié en expression cron
+      const cronExpression = utils.parseSimplifiedCron(cronInput);
       
-      if (result.success) {
+      // Générer un ID
+      const id = `${domain}-${Date.now()}`;
+      
+      // Créer la tâche programmée
+      const taskId = setupScheduledTask(domain, cronExpression, channel, id);
+      
+      if (!taskId) {
+        throw new Error("Impossible de créer la tâche programmée.");
+      }
+      
+      // Sauvegarder
+      if (saveSchedule(id, domain, cronExpression, channel)) {
         await respond({
-          text: `Rapport programmé pour *${target}* ${utils.cronToText(result.cronExpression)} dans <#${channel}>`
+          text: `:white_check_mark: Rapport programmé pour *${domain}* ${utils.cronToText(cronExpression)} dans <#${channel}>.`,
+          response_type: 'in_channel'
         });
       } else {
-        await respond({
-          text: `Erreur lors de la programmation: ${result.error}`
-        });
+        throw new Error("Erreur lors de l'enregistrement de la planification.");
       }
+      
     } catch (error) {
-      console.error('Erreur lors de la programmation:', error);
+      console.error(`Erreur lors de la planification pour ${domain}:`, error);
       await respond({
-        text: `Erreur lors de la programmation: ${error.message}`
+        text: `Erreur: ${error.message}`,
+        response_type: 'ephemeral'
       });
     }
   });
   
-  // Commande slash pour lister les rapports programmés
-  app.command('/ahrefs-list', async ({ ack, respond }) => {
+  // Commande pour lister les planifications
+  app.command('/ahrefs-list', async ({ command, ack, respond }) => {
     await ack();
     
     try {
-      const schedulesPath = path.join(__dirname, 'schedules.json');
-      const schedulesData = JSON.parse(fs.readFileSync(schedulesPath, 'utf8'));
+      const schedules = getAllSchedules();
       
-      if (schedulesData.schedules.length === 0) {
+      if (schedules.length === 0) {
         await respond({
-          text: "Aucun rapport programmé."
+          text: "Aucune tâche programmée.",
+          response_type: 'ephemeral'
         });
         return;
       }
       
-      let text = "*Rapports programmés:*\n\n";
-      schedulesData.schedules.forEach((schedule, index) => {
-        text += `${index + 1}. *${schedule.target}* - ${utils.cronToText(schedule.cronSchedule)} dans <#${schedule.channel}>\n`;
+      // Construire les blocs pour afficher les planifications
+      const blocks = [
+        {
+          type: "header",
+          text: {
+            type: "plain_text",
+            text: "Rapports Ahrefs programmés",
+            emoji: true
+          }
+        },
+        {
+          type: "divider"
+        }
+      ];
+      
+      // Ajouter chaque planification
+      schedules.forEach(schedule => {
+        blocks.push(
+          {
+            type: "section",
+            text: {
+              type: "mrkdwn",
+              text: `*${schedule.domain}*\n${utils.cronToText(schedule.cronExpression)}\nCanal: <#${schedule.channel}>`
+            },
+            accessory: {
+              type: "button",
+              text: {
+                type: "plain_text",
+                text: "Supprimer",
+                emoji: true
+              },
+              style: "danger",
+              value: schedule.id,
+              action_id: "delete_schedule"
+            }
+          },
+          {
+            type: "divider"
+          }
+        );
       });
       
-      await respond({ text });
-    } catch (error) {
-      console.error('Erreur lors de la liste des rapports:', error);
       await respond({
-        text: `Erreur lors de la récupération des rapports programmés: ${error.message}`
+        blocks,
+        text: "Rapports Ahrefs programmés",
+        response_type: 'ephemeral'
+      });
+      
+    } catch (error) {
+      console.error('Erreur lors de la liste des planifications:', error);
+      await respond({
+        text: `Erreur: ${error.message}`,
+        response_type: 'ephemeral'
       });
     }
   });
   
-  // Commande slash pour l'aide
-  app.command('/ahrefs-help', async ({ ack, respond }) => {
+  // Commande d'aide
+  app.command('/ahrefs-help', async ({ command, ack, respond }) => {
     await ack();
     
-    const helpText = `
-*Commandes Ahrefs Bot:*
-
-• \`/ahrefs-check domaine.com\` - Vérifier les backlinks cassés d'un domaine
-• \`/ahrefs-schedule domaine.com "schedule" #canal\` - Programmer un rapport récurrent
-• \`/ahrefs-list\` - Afficher tous les rapports programmés
-• \`/ahrefs-help\` - Afficher ce message d'aide
-
-*Formats d'horaire simplifiés:*
-
-• \`daily 9h\` - Tous les jours à 9h00
-• \`daily 14h30\` - Tous les jours à 14h30
-• \`weekly 9h lundi\` - Tous les lundis à 9h00
-• \`weekly 14h30 vendredi\` - Tous les vendredis à 14h30
-• \`monthly 9h 1\` - Le 1er de chaque mois à 9h00
-• \`monthly 14h30 15\` - Le 15 de chaque mois à 14h30
-
-Vous pouvez aussi utiliser les expressions cron standard si vous les connaissez.
-`;
-    
-    await respond({ text: helpText });
+    await respond({
+      blocks: [
+        {
+          type: "header",
+          text: {
+            type: "plain_text",
+            text: "Aide AhrefsBot",
+            emoji: true
+          }
+        },
+        {
+          type: "section",
+          text: {
+            type: "mrkdwn",
+            text: "*Commandes disponibles:*"
+          }
+        },
+        {
+          type: "section",
+          text: {
+            type: "mrkdwn",
+            text: "• `/ahrefs-check domaine` - Vérifier les backlinks cassés pour un domaine"
+          }
+        },
+        {
+          type: "section",
+          text: {
+            type: "mrkdwn",
+            text: "• `/ahrefs-schedule domaine \"fréquence\" #canal` - Programmer un rapport récurrent"
+          }
+        },
+        {
+          type: "section",
+          text: {
+            type: "mrkdwn",
+            text: "• `/ahrefs-list` - Afficher tous les rapports programmés"
+          }
+        },
+        {
+          type: "divider"
+        },
+        {
+          type: "section",
+          text: {
+            type: "mrkdwn",
+            text: "*Formats de fréquence supportés:*"
+          }
+        },
+        {
+          type: "section",
+          text: {
+            type: "mrkdwn",
+            text: "• `daily 9h` - Tous les jours à 9h00\n• `daily 14h30` - Tous les jours à 14h30"
+          }
+        },
+        {
+          type: "section",
+          text: {
+            type: "mrkdwn",
+            text: "• `weekly 9h lundi` - Tous les lundis à 9h00\n• `weekly 14h30 vendredi` - Tous les vendredis à 14h30"
+          }
+        },
+        {
+          type: "section",
+          text: {
+            type: "mrkdwn",
+            text: "• `monthly 9h 1` - Le 1er du mois à 9h00\n• `monthly 14h30 15` - Le 15 du mois à 14h30"
+          }
+        },
+        {
+          type: "section",
+          text: {
+            type: "mrkdwn",
+            text: "• Expression cron standard: `0 9 * * 1-5` (lun-ven à 9h00)"
+          }
+        }
+      ],
+      text: "Aide AhrefsBot",
+      response_type: 'ephemeral'
+    });
   });
   
-  // Gestion des mentions
-  app.event('app_mention', async ({ event, say }) => {
-    const text = event.text;
-    const checkPattern = /<@[A-Z0-9]+>\s+check\s+(.+)/i;
-    const helpPattern = /<@[A-Z0-9]+>\s+help/i;
+  // Action pour le bouton de suppression
+  app.action('delete_schedule', async ({ body, ack, respond }) => {
+    await ack();
     
-    if (checkPattern.test(text)) {
-      const match = text.match(checkPattern);
+    const scheduleId = body.actions[0].value;
+    
+    try {
+      if (deleteSchedule(scheduleId)) {
+        await respond({
+          text: `:white_check_mark: Planification supprimée avec succès.`,
+          replace_original: false,
+          response_type: 'ephemeral'
+        });
+      } else {
+        throw new Error("Planification non trouvée ou erreur lors de la suppression.");
+      }
+    } catch (error) {
+      console.error('Erreur lors de la suppression de la planification:', error);
+      await respond({
+        text: `Erreur: ${error.message}`,
+        replace_original: false,
+        response_type: 'ephemeral'
+      });
+    }
+  });
+  
+  // Gestionnaire de mentions
+  app.event('app_mention', async ({ event, say }) => {
+    const text = event.text.toLowerCase();
+    
+    // Pattern pour vérification
+    const checkPattern = /check\s+([a-zA-Z0-9][a-zA-Z0-9-]{1,61}(?:\.[a-zA-Z]{2,})+)/i;
+    // Pattern pour aide
+    const helpPattern = /help/i;
+    
+    const match = checkPattern.exec(text);
+    
+    if (match) {
       const target = match[1].trim();
       
+      await say({
+        text: `:hourglass_flowing_sand: Vérification des backlinks cassés pour *${target}* en cours...`,
+        thread_ts: event.ts
+      });
+      
       try {
-        await say({
-          text: `Analyse en cours pour ${target}...`,
-          thread_ts: event.ts
-        });
-        
-        const data = await getBacklinkData(target);
-        const message = utils.formatBacklinkReport(data, target);
-        
-        await say({
-          text: `Résultats pour ${target}`,
-          blocks: message,
-          thread_ts: event.ts
-        });
+        await executeBacklinkCheck(target, event.channel);
       } catch (error) {
-        console.error('Erreur lors de la vérification:', error);
+        console.error(`Erreur lors de la vérification de ${target}:`, error);
         await say({
           text: `Erreur lors de l'analyse de ${target}: ${error.message}`,
           thread_ts: event.ts
         });
       }
+      
     } else if (helpPattern.test(text)) {
-      const helpText = `
+      await say({
+        text: `
 *Commandes Ahrefs Bot:*
-
 • \`@AhrefsBot check domaine.com\` - Vérifier les backlinks cassés d'un domaine
 • Utilisez \`/ahrefs-help\` pour plus d'options
-      `;
-      
-      await say({
-        text: helpText,
+        `,
         thread_ts: event.ts
       });
+      
     } else {
       await say({
         text: "Désolé, je n'ai pas compris cette commande. Essayez `@AhrefsBot check domaine.com` ou `@AhrefsBot help`.",
@@ -301,6 +530,8 @@ Vous pouvez aussi utiliser les expressions cron standard si vous les connaissez.
 }
 
 module.exports = {
-  initializeBot,
-  app
+  initialize,
+  loadSchedules,
+  getAllSchedules,
+  executeBacklinkCheck
 };
