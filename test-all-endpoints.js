@@ -6,7 +6,7 @@ const path = require('path');
 
 // Configuration
 const API_KEY = process.env.AHREFS_API_KEY;
-const TEST_DOMAIN = 'example.com';
+const TEST_DOMAIN = 'stereolabs.com';
 const TODAY = new Date().toISOString().split('T')[0];
 
 // Résultats

@@ -17,7 +17,7 @@ La collection utilise deux variables principales qui doivent être configurées 
 2. Allez dans l'onglet "Variables"
 3. Remplacez les valeurs par défaut :
    - `ahrefs_api_key`: Insérez votre clé API Ahrefs
-   - `target_domain`: Insérez le domaine que vous souhaitez analyser (par exemple, "example.com")
+   - `target_domain`: Insérez le domaine que vous souhaitez analyser (par exemple, "stereolabs.com")
 4. Cliquez sur "Save"
 
 ### Étape 3: Exécution des requêtes
@@ -30,7 +30,7 @@ Vous pouvez maintenant exécuter n'importe quelle requête dans la collection :
 4. **Domain Rating** : Obtient le Domain Rating du domaine cible
 5. **Métriques** : Obtient diverses métriques pour le domaine
 6. **Vue d'ensemble** : Récupère un aperçu des performances du domaine
-7. **Exemple requête complexe** : Reproduit exactement la requête cURL que vous avez partagée précédemment
+7. **Exemple requête complexe** : Reproduit exactement la requête cURL
 
 ### Étape 4: Examen des réponses
 
