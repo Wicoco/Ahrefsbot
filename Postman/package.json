@@ -1,0 +1,426 @@
+
+{
+  "info": {
+    "_postman_id": "7e5d3f8a-d9eb-4bce-a22b-8c5a9fa21451",
+    "name": "Ahrefs API v3",
+    "description": "Collection pour tester l'API Ahrefs v3",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "item": [
+    {
+      "name": "Vérification du compte",
+      "request": {
+        "method": "GET",
+        "header": [
+          {
+            "key": "Authorization",
+            "value": "Bearer {{ahrefs_api_key}}",
+            "type": "text"
+          },
+          {
+            "key": "Content-Type",
+            "value": "application/json",
+            "type": "text"
+          }
+        ],
+        "url": {
+          "raw": "https://api.ahrefs.com/v3/account",
+          "protocol": "https",
+          "host": [
+            "api",
+            "ahrefs",
+            "com"
+          ],
+          "path": [
+            "v3",
+            "account"
+          ]
+        },
+        "description": "Vérifie l'état du compte et les limites d'utilisation"
+      },
+      "response": []
+    },
+    {
+      "name": "Tous les backlinks",
+      "request": {
+        "method": "GET",
+        "header": [
+          {
+            "key": "Authorization",
+            "value": "Bearer {{ahrefs_api_key}}",
+            "type": "text"
+          },
+          {
+            "key": "Content-Type",
+            "value": "application/json",
+            "type": "text"
+          }
+        ],
+        "url": {
+          "raw": "https://api.ahrefs.com/v3/site-explorer/all-backlinks?target={{target_domain}}&mode=domain&limit=50&order_by=domain_rating_source:desc&select=url_from,url_to,anchor,domain_rating_source,http_code",
+          "protocol": "https",
+          "host": [
+            "api",
+            "ahrefs",
+            "com"
+          ],
+          "path": [
+            "v3",
+            "site-explorer",
+            "all-backlinks"
+          ],
+          "query": [
+            {
+              "key": "target",
+              "value": "{{target_domain}}"
+            },
+            {
+              "key": "mode",
+              "value": "domain"
+            },
+            {
+              "key": "limit",
+              "value": "50"
+            },
+            {
+              "key": "order_by",
+              "value": "domain_rating_source:desc"
+            },
+            {
+              "key": "select",
+              "value": "url_from,url_to,anchor,domain_rating_source,http_code"
+            }
+          ]
+        },
+        "description": "Récupère tous les backlinks pour un domaine cible"
+      },
+      "response": []
+    },
+    {
+      "name": "Backlinks cassés",
+      "request": {
+        "method": "GET",
+        "header": [
+          {
+            "key": "Authorization",
+            "value": "Bearer {{ahrefs_api_key}}",
+            "type": "text"
+          },
+          {
+            "key": "Content-Type",
+            "value": "application/json",
+            "type": "text"
+          }
+        ],
+        "url": {
+          "raw": "https://api.ahrefs.com/v3/site-explorer/broken-backlinks?target={{target_domain}}&mode=domain&limit=50&select=url_from,url_to,http_code",
+          "protocol": "https",
+          "host": [
+            "api",
+            "ahrefs",
+            "com"
+          ],
+          "path": [
+            "v3",
+            "site-explorer",
+            "broken-backlinks"
+          ],
+          "query": [
+            {
+              "key": "target",
+              "value": "{{target_domain}}"
+            },
+            {
+              "key": "mode",
+              "value": "domain"
+            },
+            {
+              "key": "limit",
+              "value": "50"
+            },
+            {
+              "key": "select",
+              "value": "url_from,url_to,http_code"
+            }
+          ]
+        },
+        "description": "Récupère les backlinks cassés pour un domaine cible"
+      },
+      "response": []
+    },
+    {
+      "name": "Domain Rating",
+      "request": {
+        "method": "GET",
+        "header": [
+          {
+            "key": "Authorization",
+            "value": "Bearer {{ahrefs_api_key}}",
+            "type": "text"
+          },
+          {
+            "key": "Content-Type",
+            "value": "application/json",
+            "type": "text"
+          }
+        ],
+        "url": {
+          "raw": "https://api.ahrefs.com/v3/site-explorer/domain-rating?target={{target_domain}}&mode=domain",
+          "protocol": "https",
+          "host": [
+            "api",
+            "ahrefs",
+            "com"
+          ],
+          "path": [
+            "v3",
+            "site-explorer",
+            "domain-rating"
+          ],
+          "query": [
+            {
+              "key": "target",
+              "value": "{{target_domain}}"
+            },
+            {
+              "key": "mode",
+              "value": "domain"
+            }
+          ]
+        },
+        "description": "Récupère le Domain Rating d'un domaine"
+      },
+      "response": []
+    },
+    {
+      "name": "Métriques",
+      "request": {
+        "method": "GET",
+        "header": [
+          {
+            "key": "Authorization",
+            "value": "Bearer {{ahrefs_api_key}}",
+            "type": "text"
+          },
+          {
+            "key": "Content-Type",
+            "value": "application/json",
+            "type": "text"
+          }
+        ],
+        "url": {
+          "raw": "https://api.ahrefs.com/v3/site-explorer/metrics?target={{target_domain}}&mode=domain",
+          "protocol": "https",
+          "host": [
+            "api",
+            "ahrefs",
+            "com"
+          ],
+          "path": [
+            "v3",
+            "site-explorer",
+            "metrics"
+          ],
+          "query": [
+            {
+              "key": "target",
+              "value": "{{target_domain}}"
+            },
+            {
+              "key": "mode",
+              "value": "domain"
+            }
+          ]
+        },
+        "description": "Récupère les métriques d'un domaine"
+      },
+      "response": []
+    },
+    {
+      "name": "Vue d'ensemble",
+      "request": {
+        "method": "GET",
+        "header": [
+          {
+            "key": "Authorization",
+            "value": "Bearer {{ahrefs_api_key}}",
+            "type": "text"
+          },
+          {
+            "key": "Content-Type",
+            "value": "application/json",
+            "type": "text"
+          }
+        ],
+        "url": {
+          "raw": "https://api.ahrefs.com/v3/site-explorer/overview?target={{target_domain}}&mode=domain",
+          "protocol": "https",
+          "host": [
+            "api",
+            "ahrefs",
+            "com"
+          ],
+          "path": [
+            "v3",
+            "site-explorer",
+            "overview"
+          ],
+          "query": [
+            {
+              "key": "target",
+              "value": "{{target_domain}}"
+            },
+            {
+              "key": "mode",
+              "value": "domain"
+            }
+          ]
+        },
+        "description": "Récupère une vue d'ensemble d'un domaine"
+      },
+      "response": []
+    },
+    {
+      "name": "Exemple requête complexe (All Backlinks)",
+      "request": {
+        "method": "GET",
+        "header": [
+          {
+            "key": "Authorization",
+            "value": "Bearer {{ahrefs_api_key}}",
+            "type": "text"
+          },
+          {
+            "key": "Content-Type",
+            "value": "application/json",
+            "type": "text"
+          }
+        ],
+        "url": {
+          "raw": "https://api.ahrefs.com/v3/site-explorer/all-backlinks?aggregation=similar_links&history=since:2023-01-01&limit=50&mode=subdomains&order_by=traffic:desc,url_rating_source:desc&protocol=both&select=url_from,link_group_count,title,languages,powered_by,link_type,redirect_code,first_seen_link,lost_reason,drop_reason,http_code,discovered_status,source_page_author,is_dofollow,is_nofollow,is_ugc,is_sponsored,is_content,domain_rating_source,traffic_domain,is_root_source,root_name_source,traffic,positions,links_external,url_rating_source,last_visited,refdomains_source,linked_domains_source_page,snippet_left,anchor,snippet_right,url_to,js_crawl,http_crawl,redirect_kind,url_redirect,broken_redirect_source,broken_redirect_new_target,broken_redirect_reason,last_seen&target={{target_domain}}",
+          "protocol": "https",
+          "host": [
+            "api",
+            "ahrefs",
+            "com"
+          ],
+          "path": [
+            "v3",
+            "site-explorer",
+            "all-backlinks"
+          ],
+          "query": [
+            {
+              "key": "aggregation",
+              "value": "similar_links"
+            },
+            {
+              "key": "history",
+              "value": "since:2023-01-01"
+            },
+            {
+              "key": "limit",
+              "value": "50"
+            },
+            {
+              "key": "mode",
+              "value": "subdomains"
+            },
+            {
+              "key": "order_by",
+              "value": "traffic:desc,url_rating_source:desc"
+            },
+            {
+              "key": "protocol",
+              "value": "both"
+            },
+            {
+              "key": "select",
+              "value": "url_from,link_group_count,title,languages,powered_by,link_type,redirect_code,first_seen_link,lost_reason,drop_reason,http_code,discovered_status,source_page_author,is_dofollow,is_nofollow,is_ugc,is_sponsored,is_content,domain_rating_source,traffic_domain,is_root_source,root_name_source,traffic,positions,links_external,url_rating_source,last_visited,refdomains_source,linked_domains_source_page,snippet_left,anchor,snippet_right,url_to,js_crawl,http_crawl,redirect_kind,url_redirect,broken_redirect_source,broken_redirect_new_target,broken_redirect_reason,last_seen"
+            },
+            {
+              "key": "target",
+              "value": "{{target_domain}}"
+            }
+          ]
+        },
+        "description": "Exemple de requête avancée basée sur l'exemple cURL fourni"
+      },
+      "response": []
+    }
+  ],
+  "event": [
+    {
+      "listen": "prerequest",
+      "script": {
+        "type": "text/javascript",
+        "exec": [
+          ""
+        ]
+      }
+    },
+    {
+      "listen": "test",
+      "script": {
+        "type": "text/javascript",
+        "exec": [
+          ""
+        ]
+      }
+    }
+  ],
+  "variable": [
+    {
+      "key": "ahrefs_api_key",
+      "value": "VOTRE_CLE_API_AHREFS",
+      "type": "string"
+    },
+    {
+      "key": "target_domain",
+      "value": "example.com",
+      "type": "string"
+    }
+  ]
+}
+
+
+## 2. Guide d'utilisation de la collection Postman
+
+### Étape 1: Importation de la collection
+
+1. Ouvrez Postman
+2. Cliquez sur "Import" en haut à gauche
+3. Copiez-collez le JSON ci-dessus ou téléchargez-le comme fichier et importez-le
+4. La collection "Ahrefs API v3" sera ajoutée à votre espace de travail
+
+### Étape 2: Configuration des variables
+
+La collection utilise deux variables principales qui doivent être configurées :
+
+1. Cliquez sur le nom de la collection "Ahrefs API v3" 
+2. Allez dans l'onglet "Variables"
+3. Remplacez les valeurs par défaut :
+   - `ahrefs_api_key`: Insérez votre clé API Ahrefs
+   - `target_domain`: Insérez le domaine que vous souhaitez analyser (par exemple, "example.com")
+4. Cliquez sur "Save"
+
+### Étape 3: Exécution des requêtes
+
+Vous pouvez maintenant exécuter n'importe quelle requête dans la collection :
+
+1. **Vérification du compte** : Testez d'abord cette requête pour vérifier que votre clé API fonctionne correctement
+2. **Tous les backlinks** : Récupère les backlinks pour le domaine cible
+3. **Backlinks cassés** : Récupère les backlinks cassés
+4. **Domain Rating** : Obtient le Domain Rating du domaine cible
+5. **Métriques** : Obtient diverses métriques pour le domaine
+6. **Vue d'ensemble** : Récupère un aperçu des performances du domaine
+7. **Exemple requête complexe** : Reproduit exactement la requête cURL que vous avez partagée précédemment
+
+### Étape 4: Examen des réponses
+
+Pour chaque requête, vous pouvez :
+- Voir le statut de la réponse (200 OK signifie que tout a fonctionné)
+- Examiner le JSON retourné dans l'onglet "Body"
+- Voir les headers de la réponse dans l'onglet "Headers" 
+- Vérifier le temps de réponse dans l'onglet "Test Results"
+
