@@ -3,7 +3,7 @@ const path = require('path');
 require('dotenv').config({ path: path.resolve(__dirname, '.env') });
 
 // Importer le module ahrefsAPI personnalisé
-const ahrefsAPI = require('./ahrefsAPI');
+const ahrefsAPI = require('./ahrefsAPIV2');
 
 // Fonction principale
 async function main() {
