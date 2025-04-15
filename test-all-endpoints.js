@@ -11,9 +11,46 @@ const TODAY = new Date().toISOString().split('T')[0];
 
 // Résultats
 const results = {
-  v2: { working: [], failed: [] },
-  v3: { working: [], failed: [] }
+  date: new Date().toISOString(),
+  domain_tested: TEST_DOMAIN,
+  summary: {
+    v3_working: 0,
+    v3_failed: 0,
+    v2_working: 0,
+    v2_failed: 0
+  },
+  working_endpoints: {
+    v3: [],
+    v2: []
+  },
+  failed_endpoints: {
+    v3: [],
+    v2: []
+  }
 };
+
+// Fonction pour masquer le token dans les données
+function sanitizeData(data) {
+  if (!data) return data;
+  
+  let text = typeof data === 'string' ? data : JSON.stringify(data);
+  
+  // Masquer le token s'il est présent
+  if (API_KEY && API_KEY.length > 5) {
+    const tokenPattern = new RegExp(API_KEY.substring(0, 10) + '[^"\\s]*', 'g');
+    text = text.replace(tokenPattern, '[REDACTED]');
+    text = text.replace(/"token"\s*:\s*"[^"]*"/g, '"token": "[REDACTED]"');
+  }
+  
+  // Masquer les adresses IP
+  text = text.replace(/\b\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}\b/g, '[IP_ADDRESS]');
+  text = text.replace(/"ip"\s*:\s*"[^"]*"/g, '"ip": "[REDACTED]"');
+  
+  // Masquer le token en minuscules/majuscules aussi
+  text = text.replace(/token\s+is\s+[^"]+/gi, 'token is [REDACTED]');
+  
+  return typeof data === 'string' ? text : JSON.parse(text);
+}
 
 // Fonction pour tester un endpoint v3
 async function testV3Endpoint(name, url, params) {
@@ -22,45 +59,39 @@ async function testV3Endpoint(name, url, params) {
     const response = await axios.get(`https://api.ahrefs.com/v3${url}`, {
       params: params,
       headers: { 'Authorization': `Bearer ${API_KEY}` },
-      timeout: 10000 // 10 secondes timeout
+      timeout: 15000 // 15 secondes timeout
     });
     
     console.log(`✅ SUCCÈS: ${name}`);
-    console.log(`Statut: ${response.status}`);
     
-    // Sauvegarder les premiers 500 caractères des données
-    const dataSample = JSON.stringify(response.data, null, 2).substring(0, 500);
-    console.log(`Aperçu des données: ${dataSample}${dataSample.length >= 500 ? '...' : ''}`);
-    
-    results.v3.working.push({
+    // Stocker l'endpoint fonctionnel dans les résultats
+    results.working_endpoints.v3.push({
       name,
-      url,
-      params,
-      status: response.status,
-      dataSample
+      url
     });
     
+    results.summary.v3_working++;
     return true;
   } catch (error) {
     console.error(`❌ ÉCHEC: ${name}`);
-    let errorDetails = { message: error.message };
+    let errorInfo = '';
     
     if (error.response) {
       console.error(`Statut: ${error.response.status}`);
-      console.error(`Données: ${JSON.stringify(error.response.data, null, 2)}`);
-      errorDetails = {
-        status: error.response.status,
-        data: error.response.data
-      };
+      errorInfo = JSON.stringify(sanitizeData(error.response.data));
+    } else {
+      console.error(`Erreur: ${error.message}`);
+      errorInfo = error.message;
     }
     
-    results.v3.failed.push({
+    // Stocker l'erreur dans les résultats
+    results.failed_endpoints.v3.push({
       name,
       url,
-      params,
-      error: errorDetails
+      error: sanitizeData(errorInfo)
     });
     
+    results.summary.v3_failed++;
     return false;
   }
 }
@@ -77,137 +108,123 @@ async function testV2Endpoint(name, params) {
     
     const response = await axios.get('https://apiv2.ahrefs.com', {
       params: finalParams,
-      timeout: 10000 // 10 secondes timeout
+      timeout: 15000 // 15 secondes timeout
     });
     
     console.log(`✅ SUCCÈS: ${name}`);
-    console.log(`Statut: ${response.status}`);
     
-    // Sauvegarder les premiers 500 caractères des données
-    const dataSample = JSON.stringify(response.data, null, 2).substring(0, 500);
-    console.log(`Aperçu des données: ${dataSample}${dataSample.length >= 500 ? '...' : ''}`);
-    
-    results.v2.working.push({
+    // Stocker l'endpoint fonctionnel dans les résultats
+    results.working_endpoints.v2.push({
       name,
-      params,
-      status: response.status,
-      dataSample
+      from: params.from
     });
     
+    results.summary.v2_working++;
     return true;
   } catch (error) {
     console.error(`❌ ÉCHEC: ${name}`);
-    let errorDetails = { message: error.message };
+    let errorInfo = '';
     
     if (error.response) {
       console.error(`Statut: ${error.response.status}`);
-      console.error(`Données: ${JSON.stringify(error.response.data, null, 2)}`);
-      errorDetails = {
-        status: error.response.status,
-        data: error.response.data
-      };
+      errorInfo = JSON.stringify(sanitizeData(error.response.data));
+    } else if (error.message) {
+      console.error(`Erreur: ${error.message}`);
+      errorInfo = error.message;
     }
     
-    results.v2.failed.push({
+    // Si la réponse est un objet avec une propriété error
+    if (typeof error.response?.data === 'object' && error.response.data.error) {
+      errorInfo = sanitizeData(error.response.data.error);
+    }
+    
+    // Stocker l'erreur dans les résultats
+    results.failed_endpoints.v2.push({
       name,
-      params,
-      error: errorDetails
+      from: params.from,
+      error: sanitizeData(errorInfo)
     });
     
+    results.summary.v2_failed++;
     return false;
   }
 }
 
+// Sauvegarde des résultats dans un fichier
 async function saveResults() {
-  const resultsDir = path.join(__dirname, 'results');
   try {
+    // Créer le dossier results s'il n'existe pas
+    const resultsDir = path.join(__dirname, 'results');
     await fs.mkdir(resultsDir, { recursive: true });
+    
+    // Nom de fichier basé sur la date actuelle
+    const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
+    const jsonFileName = `ahrefs_api_report_${timestamp}.json`;
+    const jsonFilePath = path.join(resultsDir, jsonFileName);
+    
+    // Sauvegarder en JSON
+    await fs.writeFile(jsonFilePath, JSON.stringify(results, null, 2));
+    console.log(`\nRésultats sauvegardés dans: ${jsonFilePath}`);
+    
+    return jsonFilePath;
   } catch (err) {
-    // Ignore if directory exists
+    console.error("Erreur lors de la sauvegarde des résultats:", err);
   }
-  
-  const fileName = `ahrefs_api_test_${new Date().toISOString().replace(/[:.]/g, '-')}.json`;
-  const filePath = path.join(resultsDir, fileName);
-  
-  await fs.writeFile(filePath, JSON.stringify(results, null, 2));
-  console.log(`\nRésultats sauvegardés dans: ${filePath}`);
 }
 
+// Fonction principale qui exécute tous les tests
 async function runTests() {
   console.log("=== DÉBUT DES TESTS API AHREFS ===");
   console.log(`Domaine de test: ${TEST_DOMAIN}`);
-  console.log(`Date: ${TODAY}\n`);
+  console.log(`Date des tests: ${new Date().toLocaleString()}\n`);
   
   // Liste des endpoints API v3 à tester
   const v3Endpoints = [
-    // Compte et informations générales
+    // Endpoints publics (sans l'endpoint des IPs)
     {
-      name: "Informations du compte",
-      url: "/account/info",
-      params: {}
-    },
-    {
-      name: "Quota du compte",
-      url: "/account/quota",
+      name: "Limites et usage",
+      url: "/account/subscription",
       params: {}
     },
     
-    // Site Explorer - Métriques générales
+    // Site Explorer - Vue d'ensemble
     {
-      name: "Domain Rating",
-      url: "/site-explorer/domain-rating",
-      params: { target: TEST_DOMAIN, date: TODAY }
+      name: "Backlinks Overview",
+      url: "/site-explorer/overview",
+      params: { target: TEST_DOMAIN, mode: 'domain' }
     },
     {
-      name: "URL Rating",
-      url: "/site-explorer/url-rating",
-      params: { target: TEST_DOMAIN, date: TODAY }
-    },
-    {
-      name: "Métriques",
-      url: "/site-explorer/metrics",
-      params: { target: TEST_DOMAIN, mode: 'domain', date: TODAY }
+      name: "Organic Search",
+      url: "/site-explorer/organic-search",
+      params: { target: TEST_DOMAIN, mode: 'domain' }
     },
     
     // Site Explorer - Backlinks
     {
       name: "Backlinks",
       url: "/site-explorer/backlinks",
-      params: { target: TEST_DOMAIN, mode: 'domain', order_by: 'ahrefs_rank:desc', date: TODAY, limit: 5 }
-    },
-    {
-      name: "Backlinks brisés",
-      url: "/site-explorer/broken-backlinks",
-      params: { target: TEST_DOMAIN, mode: 'domain', date: TODAY, limit: 5 }
-    },
-    {
-      name: "Nouvelles backlinks",
-      url: "/site-explorer/new-backlinks",
-      params: { target: TEST_DOMAIN, mode: 'domain', date: TODAY, limit: 5 }
+      params: { target: TEST_DOMAIN, mode: 'domain', limit: 5 }
     },
     
-    // Site Explorer - Domaines référents
+    // Site Explorer - Keywords
     {
-      name: "Domaines référents",
-      url: "/site-explorer/referring-domains",
-      params: { target: TEST_DOMAIN, mode: 'domain', order_by: 'domain_rating:desc', date: TODAY, limit: 5 }
+      name: "Mots-clés organiques",
+      url: "/site-explorer/organic-keywords",
+      params: { target: TEST_DOMAIN, mode: 'domain', select: 'keyword,position,volume', limit: 5 }
     },
+    
+    // Site Explorer - Contenu
     {
-      name: "Nouveaux domaines référents",
-      url: "/site-explorer/new-referring-domains",
-      params: { target: TEST_DOMAIN, mode: 'domain', date: TODAY, limit: 5 }
+      name: "Contenu Top",
+      url: "/site-explorer/top-content",
+      params: { target: TEST_DOMAIN, mode: 'domain', limit: 5 }
     },
     
     // Site Explorer - Pages
     {
-      name: "Meilleures pages par trafic",
-      url: "/site-explorer/top-pages",
-      params: { target: TEST_DOMAIN, mode: 'domain', order_by: 'traffic:desc', date: TODAY, limit: 5 }
-    },
-    {
       name: "Pages les plus liées",
       url: "/site-explorer/best-by-links",
-      params: { target: TEST_DOMAIN, mode: 'domain', date: TODAY, limit: 5 }
+      params: { target: TEST_DOMAIN, mode: 'domain', limit: 5 }
     }
   ];
   
@@ -257,26 +274,53 @@ async function runTests() {
   
   // Résumé des résultats
   console.log("\n=== RÉSUMÉ DES TESTS ===");
-  console.log(`API v3 - Endpoints fonctionnels: ${results.v3.working.length}/${v3Endpoints.length}`);
-  console.log(`API v2 - Endpoints fonctionnels: ${results.v2.working.length}/${v2Endpoints.length}`);
+  console.log(`API v3 - Endpoints fonctionnels: ${results.summary.v3_working}/${v3Endpoints.length}`);
+  console.log(`API v2 - Endpoints fonctionnels: ${results.summary.v2_working}/${v2Endpoints.length}`);
   
   // Lister les endpoints fonctionnels
-  if (results.v3.working.length > 0) {
+  if (results.summary.v3_working > 0) {
     console.log("\nEndpoints V3 fonctionnels:");
-    results.v3.working.forEach(endpoint => console.log(`- ${endpoint.name} (${endpoint.url})`));
+    results.working_endpoints.v3.forEach(endpoint => {
+      console.log(`- ${endpoint.name} (${endpoint.url})`);
+    });
   }
   
-  if (results.v2.working.length > 0) {
+  if (results.summary.v2_working > 0) {
     console.log("\nEndpoints V2 fonctionnels:");
-    results.v2.working.forEach(endpoint => console.log(`- ${endpoint.name} (from=${endpoint.params.from})`));
+    results.working_endpoints.v2.forEach(endpoint => {
+      console.log(`- ${endpoint.name} (from=${endpoint.from})`);
+    });
   }
   
-  // Sauvegarder les résultats dans un fichier
-  await saveResults();
+  // Analyse des erreurs les plus courantes
+  console.log("\nTypes d'erreurs rencontrés:");
+  const errorMessages = new Set();
+  
+  [...results.failed_endpoints.v3, ...results.failed_endpoints.v2].forEach(endpoint => {
+    let error = endpoint.error;
+    if (error) errorMessages.add(error);
+  });
+  
+  Array.from(errorMessages).forEach(message => {
+    console.log(`- ${message}`);
+  });
+  
+  // Sauvegarder les résultats
+  const filePath = await saveResults();
+  
+  console.log("\n=== RECOMMANDATIONS ===");
+  if (results.summary.v3_working === 0 && results.summary.v2_working === 0) {
+    console.log("Aucun endpoint n'est accessible. Vérifiez votre token API et votre forfait Ahrefs.");
+    console.log("Vous devez peut-être générer un nouveau token avec les bonnes autorisations.");
+  } else {
+    console.log("Utilisez ces endpoints fonctionnels pour construire votre application.");
+  }
   
   console.log("\n=== FIN DES TESTS ===");
+  return filePath;
 }
 
+// Exécuter les tests
 runTests().catch(err => {
-  console.error("Erreur globale:", err);
+  console.error("Erreur globale pendant l'exécution des tests:", err);
 });
