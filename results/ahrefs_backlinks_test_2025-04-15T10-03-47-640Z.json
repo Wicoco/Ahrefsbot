@@ -1,0 +1,229 @@
+{
+  "date": "2025-04-15T10:03:45.842Z",
+  "domain_tested": "example.com",
+  "summary": {
+    "v3_working": 0,
+    "v3_failed": 6,
+    "v2_working": 10,
+    "v2_failed": 0
+  },
+  "working_endpoints": {
+    "v3": [],
+    "v2": [
+      {
+        "name": "Backlinks",
+        "from": "backlinks",
+        "params": {
+          "from": "backlinks",
+          "target": "example.com",
+          "mode": "domain",
+          "limit": 5,
+          "token": "[REDACTED]"
+        },
+        "sample": "{\"error\":\"token [REDACTED] is missing the required 'api' scope\"}..."
+      },
+      {
+        "name": "Nouvelles Backlinks",
+        "from": "new_backlinks",
+        "params": {
+          "from": "new_backlinks",
+          "target": "example.com",
+          "mode": "domain",
+          "limit": 5,
+          "token": "[REDACTED]"
+        },
+        "sample": "{\"error\":\"from: table 'new_backlinks' not found\"}..."
+      },
+      {
+        "name": "Backlinks Perdues",
+        "from": "lost_backlinks",
+        "params": {
+          "from": "lost_backlinks",
+          "target": "example.com",
+          "mode": "domain",
+          "limit": 5,
+          "token": "[REDACTED]"
+        },
+        "sample": "{\"error\":\"from: table 'lost_backlinks' not found\"}..."
+      },
+      {
+        "name": "Domaines référents",
+        "from": "refdomains",
+        "params": {
+          "from": "refdomains",
+          "target": "example.com",
+          "mode": "domain",
+          "limit": 5,
+          "token": "[REDACTED]"
+        },
+        "sample": "{\"error\":\"token [REDACTED] is missing the required 'api' scope\"}..."
+      },
+      {
+        "name": "Nouveaux Domaines Référents",
+        "from": "new_refdomains",
+        "params": {
+          "from": "new_refdomains",
+          "target": "example.com",
+          "mode": "domain",
+          "limit": 5,
+          "token": "[REDACTED]"
+        },
+        "sample": "{\"error\":\"from: table 'new_refdomains' not found\"}..."
+      },
+      {
+        "name": "Domaines Référents Perdus",
+        "from": "lost_refdomains",
+        "params": {
+          "from": "lost_refdomains",
+          "target": "example.com",
+          "mode": "domain",
+          "limit": 5,
+          "token": "[REDACTED]"
+        },
+        "sample": "{\"error\":\"from: table 'lost_refdomains' not found\"}..."
+      },
+      {
+        "name": "Liens brisés",
+        "from": "broken_backlinks",
+        "params": {
+          "from": "broken_backlinks",
+          "target": "example.com",
+          "mode": "domain",
+          "limit": 5,
+          "token": "[REDACTED]"
+        },
+        "sample": "{\"error\":\"token [REDACTED] is missing the required 'api' scope\"}..."
+      },
+      {
+        "name": "Anchors",
+        "from": "anchors",
+        "params": {
+          "from": "anchors",
+          "target": "example.com",
+          "mode": "domain",
+          "limit": 5,
+          "token": "[REDACTED]"
+        },
+        "sample": "{\"error\":\"token [REDACTED] is missing the required 'api' scope\"}..."
+      },
+      {
+        "name": "Pages Avec Backlinks",
+        "from": "pages_backlinks",
+        "params": {
+          "from": "pages_backlinks",
+          "target": "example.com",
+          "mode": "domain",
+          "limit": 5,
+          "token": "[REDACTED]"
+        },
+        "sample": "{\"error\":\"from: table 'pages_backlinks' not found\"}..."
+      },
+      {
+        "name": "Pages Avec Domaines Référents",
+        "from": "pages_info_refdomains",
+        "params": {
+          "from": "pages_info_refdomains",
+          "target": "example.com",
+          "mode": "domain",
+          "limit": 5,
+          "token": "[REDACTED]"
+        },
+        "sample": "{\"error\":\"from: table 'pages_info_refdomains' not found\"}..."
+      }
+    ]
+  },
+  "failed_endpoints": {
+    "v3": [
+      {
+        "name": "Backlinks Overview",
+        "url": "/site-explorer/overview",
+        "params": {
+          "target": "example.com",
+          "mode": "domain"
+        },
+        "error": [
+          "Error",
+          [
+            "NotFound",
+            "this route does not exist /v3/site-explorer/overview"
+          ]
+        ]
+      },
+      {
+        "name": "Backlinks",
+        "url": "/site-explorer/backlinks",
+        "params": {
+          "target": "example.com",
+          "mode": "domain",
+          "limit": 5
+        },
+        "error": [
+          "Error",
+          [
+            "NotFound",
+            "this route does not exist /v3/site-explorer/backlinks"
+          ]
+        ]
+      },
+      {
+        "name": "Referring Domains",
+        "url": "/site-explorer/referring-domains",
+        "params": {
+          "target": "example.com",
+          "mode": "domain",
+          "limit": 5
+        },
+        "error": [
+          "Error",
+          [
+            "NotFound",
+            "this route does not exist /v3/site-explorer/referring-domains"
+          ]
+        ]
+      },
+      {
+        "name": "Broken Backlinks",
+        "url": "/site-explorer/broken-backlinks",
+        "params": {
+          "target": "example.com",
+          "mode": "domain",
+          "limit": 5
+        },
+        "error": {
+          "error": "missing argument select"
+        }
+      },
+      {
+        "name": "Best By Links",
+        "url": "/site-explorer/best-by-links",
+        "params": {
+          "target": "example.com",
+          "mode": "domain",
+          "limit": 5
+        },
+        "error": [
+          "Error",
+          [
+            "NotFound",
+            "this route does not exist /v3/site-explorer/best-by-links"
+          ]
+        ]
+      },
+      {
+        "name": "Link Growth",
+        "url": "/site-explorer/metrics",
+        "params": {
+          "target": "example.com",
+          "mode": "domain",
+          "metrics": "backlinks,referring_domains",
+          "date_from": "2023-01-01",
+          "date_to": "2025-04-15"
+        },
+        "error": {
+          "error": "missing argument date"
+        }
+      }
+    ],
+    "v2": []
+  }
+}
